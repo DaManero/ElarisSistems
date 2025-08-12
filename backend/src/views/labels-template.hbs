@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Etiquetas de Envío - Lote {{batchId}}</title>
+    <style>
+        /* ==========================================
+           ESTILOS PARA IMPRESIÓN DE ETIQUETAS
+           ========================================== */
+        
+        @page {
+            size: A4;
+            margin: 10mm;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: white;
+            color: black;
+            font-size: 14px; /* Aumentado de 12px */
+        }
+        
+        /* CONTENEDOR DE PÁGINA */
+        .page {
+            width: 210mm;
+            height: 297mm;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(3, 1fr); /* 3 filas para 6 etiquetas */
+            gap: 3mm;
+            page-break-after: always;
+            padding: 5mm;
+        }
+        
+        .page:last-child {
+            page-break-after: avoid;
+        }
+        
+        /* ETIQUETA INDIVIDUAL */
+        .label {
+            width: 95mm;
+            height: 90mm; /* Ajustado para 6 etiquetas */
+            border: 2px solid #000;
+            padding: 3mm;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background: white;
+            position: relative;
+        }
+        
+        .label-empty {
+            border: 1px dashed #ccc;
+            background: #f9f9f9;
+        }
+        
+        /* HEADER DE LA ETIQUETA */
+        .label-header {
+            text-align: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 2mm;
+            margin-bottom: 3mm;
+        }
+        
+        .sale-number {
+            font-size: 18px; /* Aumentado de 16px */
+            font-weight: bold;
+            margin-bottom: 2mm;
+            letter-spacing: 1px;
+        }
+        
+        .dates {
+            font-size: 12px; /* Aumentado de 10px */
+            line-height: 1.3;
+            color: #333;
+        }
+        
+        .date-line {
+            margin-bottom: 1mm;
+        }
+        
+        /* INFORMACIÓN DEL CLIENTE */
+        .customer-info {
+            flex-grow: 1;
+            margin-bottom: 3mm;
+        }
+        
+        .customer-name {
+            font-size: 16px; /* Aumentado de 14px */
+            font-weight: bold;
+            margin-bottom: 2mm;
+            text-transform: uppercase;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 2mm;
+        }
+        
+        .customer-phone {
+            font-size: 13px; /* Aumentado de 11px */
+            margin-bottom: 2mm;
+            display: flex;
+            align-items: center;
+            gap: 2mm;
+        }
+        
+        .phone-icon {
+            font-weight: bold;
+        }
+        
+        .customer-address {
+            font-size: 12px; /* Aumentado de 10px */
+            line-height: 1.4;
+            margin-bottom: 3mm;
+            padding: 2mm;
+            border: 1px solid #ddd;
+            border-radius: 2mm;
+            background: #f9f9f9;
+            min-height: 12mm; /* Reducido de 15mm */
+        }
+        
+        .address-icon {
+            font-weight: bold;
+            margin-bottom: 1mm;
+            display: block;
+        }
+        
+        /* INFORMACIÓN DE PAGO */
+        .payment-info {
+            text-align: center;
+            padding: 2mm;
+            border: 2px solid #000;
+            font-size: 14px; /* Aumentado de 13px */
+            font-weight: bold;
+            margin-top: auto;
+        }
+        
+        .payment-paid {
+            background-color: #e8f5e8;
+            border-color: #16a34a;
+            color: #16a34a;
+        }
+        
+        .payment-pending {
+            background-color: #fff3cd;
+            border-color: #f59e0b;
+            color: #d97706;
+        }
+        
+        .payment-amount {
+            font-size: 16px; /* Aumentado de 15px */
+            margin-top: 1mm;
+        }
+        
+        /* ESTILOS PARA IMPRESIÓN */
+        @media print {
+            body {
+                margin: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            .page {
+                page-break-after: always;
+                margin: 0;
+            }
+            
+            .page:last-child {
+                page-break-after: avoid;
+            }
+            
+            .label {
+                break-inside: avoid;
+            }
+            
+            /* Asegurar que los colores se impriman */
+            .payment-paid,
+            .payment-pending,
+            .customer-address {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+        
+        /* RESPONSIVE PARA VISTA PREVIA */
+        @media screen and (max-width: 1200px) {
+            .page {
+                transform: scale(0.7);
+                transform-origin: top left;
+                margin-bottom: 60mm;
+            }
+        }
+        
+        @media screen and (max-width: 800px) {
+            .page {
+                grid-template-columns: 1fr;
+                grid-template-rows: repeat(6, 1fr);
+                transform: scale(0.5);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER INFORMATIVO (solo para vista previa, no se imprime) -->
+    <div style="text-align: center; padding: 10mm 0; border-bottom: 1px solid #ccc; margin-bottom: 5mm;">
+        <h1 style="margin: 0; font-size: 20px; color: #333;">
+            🏷️ Etiquetas de Envío - Lote {{batchId}}
+        </h1>
+        <p style="margin: 5mm 0 0 0; font-size: 14px; color: #666;">
+            Total de etiquetas: {{totalLabels}} | Páginas: {{totalPages}} | 
+            Generado: {{generationDate}}
+        </p>
+        <p style="margin: 2mm 0 0 0; font-size: 12px; color: #999;">
+            Presiona <strong>Ctrl+P</strong> para imprimir | 6 etiquetas por página (100x95mm)
+        </p>
+    </div>
+
+    <!-- PÁGINAS DE ETIQUETAS -->
+    <!-- Página de ejemplo con 6 etiquetas -->
+    <div class="page">
+        <!-- Etiqueta 1 -->
+        <div class="label">
+            <div class="label-header">
+                <div class="sale-number">V-001</div>
+                <div class="dates">
+                    <div class="date-line"><strong>Venta:</strong> 14/07/2025</div>
+                    <div class="date-line"><strong>Envío:</strong> 15/07/2025</div>
+                </div>
+            </div>
+            
+            <div class="customer-info">
+                <div class="customer-name">María González</div>
+                
+                <div class="customer-phone">
+                    <span class="phone-icon">📞</span>
+                    <span>+54 11 1234-5678</span>
+                </div>
+                
+                <div class="customer-address">
+                    <span class="address-icon">📍 Dirección:</span>
+                    Av. Corrientes 1234, CABA, Buenos Aires
+                </div>
+            </div>
+            
+            <div class="payment-info payment-paid">
+                ✅ PAGADO
+            </div>
+        </div>
+        
+        <!-- Etiqueta 2 -->
+        <div class="label">
+            <div class="label-header">
+                <div class="sale-number">V-002</div>
+                <div class="dates">
+                    <div class="date-line"><strong>Venta:</strong> 14/07/2025</div>
+                    <div class="date-line"><strong>Envío:</strong> 15/07/2025</div>
+                </div>
+            </div>
+            
+            <div class="customer-info">
+                <div class="customer-name">Carlos Rodríguez</div>
+                
+                <div class="customer-phone">
+                    <span class="phone-icon">📞</span>
+                    <span>+54 11 9876-5432</span>
+                </div>
+                
+                <div class="customer-address">
+                    <span class="address-icon">📍 Dirección:</span>
+                    Calle Florida 567, Palermo, CABA
+                </div>
+            </div>
+            
+            <div class="payment-info payment-pending">
+                💰 A PAGAR
+                <div class="payment-amount">$15.500</div>
+            </div>
+        </div>
+        
+        <!-- Etiqueta 3 -->
+        <div class="label">
+            <div class="label-header">
+                <div class="sale-number">V-003</div>
+                <div class="dates">
+                    <div class="date-line"><strong>Venta:</strong> 14/07/2025</div>
+                    <div class="date-line"><strong>Envío:</strong> 15/07/2025</div>
+                </div>
+            </div>
+            
+            <div class="customer-info">
+                <div class="customer-name">Ana Martínez</div>
+                
+                <div class="customer-phone">
+                    <span class="phone-icon">📞</span>
+                    <span>+54 11 5555-6666</span>
+                </div>
+                
+                <div class="customer-address">
+                    <span class="address-icon">📍 Dirección:</span>
+                    Av. Santa Fe 2890, Recoleta, CABA
+                </div>
+            </div>
+            
+            <div class="payment-info payment-paid">
+                ✅ PAGADO
+            </div>
+        </div>
+        
+        <!-- Etiqueta 4 -->
+        <div class="label">
+            <div class="label-header">
+                <div class="sale-number">V-004</div>
+                <div class="dates">
+                    <div class="date-line"><strong>Venta:</strong> 14/07/2025</div>
+                    <div class="date-line"><strong>Envío:</strong> 15/07/2025</div>
+                </div>
+            </div>
+            
+            <div class="customer-info">
+                <div class="customer-name">Luis Fernández</div>
+                
+                <div class="customer-phone">
+                    <span class="phone-icon">📞</span>
+                    <span>+54 11 7777-8888</span>
+                </div>
+                
+                <div class="customer-address">
+                    <span class="address-icon">📍 Dirección:</span>
+                    Av. Cabildo 1245, Belgrano, CABA
+                </div>
+            </div>
+            
+            <div class="payment-info payment-pending">
+                💰 A PAGAR
+                <div class="payment-amount">$22.300</div>
+            </div>
+        </div>
+        
+        <!-- Etiqueta 5 -->
+        <div class="label">
+            <div class="label-header">
+                <div class="sale-number">V-005</div>
+                <div class="dates">
+                    <div class="date-line"><strong>Venta:</strong> 14/07/2025</div>
+                    <div class="date-line"><strong>Envío:</strong> 15/07/2025</div>
+                </div>
+            </div>
+            
+            <div class="customer-info">
+                <div class="customer-name">Sofia López</div>
+                
+                <div class="customer-phone">
+                    <span class="phone-icon">📞</span>
+                    <span>+54 11 3333-4444</span>
+                </div>
+                
+                <div class="customer-address">
+                    <span class="address-icon">📍 Dirección:</span>
+                    Av. Rivadavia 4567, Caballito, CABA
+                </div>
+            </div>
+            
+            <div class="payment-info payment-paid">
+                ✅ PAGADO
+            </div>
+        </div>
+        
+        <!-- Etiqueta 6 -->
+        <div class="label">
+            <div class="label-header">
+                <div class="sale-number">V-006</div>
+                <div class="dates">
+                    <div class="date-line"><strong>Venta:</strong> 14/07/2025</div>
+                    <div class="date-line"><strong>Envío:</strong> 15/07/2025</div>
+                </div>
+            </div>
+            
+            <div class="customer-info">
+                <div class="customer-name">Diego Herrera</div>
+                
+                <div class="customer-phone">
+                    <span class="phone-icon">📞</span>
+                    <span>+54 11 2222-3333</span>
+                </div>
+                
+                <div class="customer-address">
+                    <span class="address-icon">📍 Dirección:</span>
+                    Av. Las Heras 890, Barrio Norte, CABA
+                </div>
+            </div>
+            
+            <div class="payment-info payment-pending">
+                💰 A PAGAR
+                <div class="payment-amount">$18.900</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT PARA FUNCIONALIDAD ADICIONAL -->
+    <script>
+        // Auto-focus en la ventana para que esté lista para imprimir
+        window.focus();
+        
+        // Función para imprimir automáticamente (opcional)
+        function autoPrint() {
+            setTimeout(() => {
+                window.print();
+            }, 1000);
+        }
+        
+        // Mostrar información en consola para debugging
+        console.log('🏷️ Etiquetas cargadas:', {
+            batchId: '{{batchId}}',
+            totalLabels: {{totalLabels}},
+            totalPages: {{totalPages}},
+            etiquetasPorPagina: 6,
+            tamañoEtiqueta: '100x95mm',
+            timestamp: new Date().toISOString()
+        });
+        
+        // Detectar cuando se termine de cargar para auto-imprimir (comentado por defecto)
+        // window.addEventListener('load', autoPrint);
+        
+        // Atajos de teclado
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+P para imprimir
+            if (e.ctrlKey && e.key === 'p') {
+                e.preventDefault();
+                window.print();
+            }
+            
+            // Escape para cerrar
+            if (e.key === 'Escape') {
+                window.close();
+            }
+        });
+        
+        // Mensaje en la consola con instrucciones
+        console.log('🔧 Instrucciones:');
+        console.log('  - Ctrl+P: Imprimir etiquetas');
+        console.log('  - Escape: Cerrar ventana');
+        console.log('  - Configuración: A4, 6 etiquetas por página (100x95mm)');
+        console.log('  - Asegúrate de configurar la impresora para papel A4');
+    </script>
+</body>
+</html>
