@@ -949,16 +949,32 @@ class ShipmentController {
                     const metodoPago =
                       venta?.metodoPago?.nombre || "No especificado";
                     let monto = "";
-                    if (
-                      metodoPago === "Efectivo" ||
-                      metodoPago === "Contraentrega"
-                    ) {
-                      monto = `$${parseFloat(venta.total || 0).toLocaleString(
+
+                    // 🎯 LÓGICA CORRECTA: Verificar el estado de pago real
+                    const estadoPagoReal =
+                      shipment.estado_pago_real || "Pendiente";
+                    const estadoPagoVenta = venta?.estado_pago || "Pendiente";
+
+                    // Verificar si está realmente pagado (cualquiera de los dos estados)
+                    const estaPagado =
+                      estadoPagoReal === "Pagado" ||
+                      estadoPagoVenta === "Pagado";
+
+                    if (estaPagado) {
+                      monto = "PAGADO";
+                    } else {
+                      // Mostrar el monto que debe pagar
+                      const montoPendiente = parseFloat(venta.total || 0);
+                      monto = `DEBE: $${montoPendiente.toLocaleString(
                         "es-ES"
                       )}`;
-                    } else {
-                      monto = "Pagado";
                     }
+
+                    // 🆕 OPCIONAL: Agregar información del método de pago
+                    const metodoPagoInfo =
+                      metodoPago && metodoPago !== "No especificado"
+                        ? ` (${metodoPago})`
+                        : "";
 
                     const productos =
                       items
@@ -982,7 +998,7 @@ class ShipmentController {
                       <td>${direccion}</td>
                       <td class="monto">
                         <strong>${monto}</strong><br>
-                        <small>${metodoPago}</small>
+                        <small metodoPagoall>${metodoPago}</small>
                       </td>
                     </tr>
                   `;
@@ -1122,7 +1138,7 @@ class ShipmentController {
       `);
       }
 
-      // 2. Formatear datos para etiquetas CON PRODUCTOS
+      // 2. Formatear datos para etiquetas CON PRODUCTOS Y MÉTODO DE PAGO
       const labels = shipments.map((shipment) => {
         const sale = shipment.venta;
         const cliente = sale.cliente;
@@ -1173,7 +1189,25 @@ class ShipmentController {
             "es-ES"
           )}`,
           rawAmount: parseFloat(sale.total || 0),
-          productInfo: productInfo, // 🆕 Productos incluidos
+          productInfo: productInfo,
+          // 🆕 AGREGAR MÉTODO DE PAGO
+          paymentMethod: sale.metodoPago?.nombre || "No especificado",
+          // 🆕 INFORMACIÓN COMPLETA DE PAGO (para mostrar en etiqueta)
+          paymentInfo: (() => {
+            const isPaid =
+              sale.estado_pago === "Pagado" ||
+              shipment.estado_pago_real === "Pagado";
+            const metodo = sale.metodoPago?.nombre || "No especificado";
+            const monto = `$${parseFloat(sale.total || 0).toLocaleString(
+              "es-ES"
+            )}`;
+
+            if (isPaid) {
+              return `✅ PAGADO (${metodo})`;
+            } else {
+              return `💰 ${monto} (${metodo})`;
+            }
+          })(),
         };
       });
 
@@ -1181,7 +1215,9 @@ class ShipmentController {
       console.log(`🔍 Debug productos para lote ${batchId}:`);
       labels.slice(0, 3).forEach((label, index) => {
         console.log(
-          `  Etiqueta ${index + 1}: ${label.saleNumber} -> ${label.productInfo}`
+          `  Etiqueta ${index + 1}: ${label.saleNumber} -> ${
+            label.productInfo
+          } -> ${label.paymentMethod}`
         );
       });
 
@@ -1195,6 +1231,25 @@ class ShipmentController {
         }
         pages.push({ labels: pageLabels });
       }
+
+      // 🔧 FUNCIÓN HELPER para obtener clase CSS según método de pago
+      const getPaymentMethodClass = (paymentMethod) => {
+        if (!paymentMethod || paymentMethod === "No especificado") return "";
+
+        const method = paymentMethod.toLowerCase();
+        if (method.includes("efectivo")) return "method-efectivo";
+        if (method.includes("transferencia") || method.includes("transfer"))
+          return "method-transferencia";
+        if (
+          method.includes("tarjeta") ||
+          method.includes("débito") ||
+          method.includes("crédito")
+        )
+          return "method-tarjeta";
+        if (method.includes("contraentrega")) return "method-contraentrega";
+
+        return "";
+      };
 
       // 4. Generar HTML completo con las etiquetas
       const htmlContent = `
@@ -1294,27 +1349,26 @@ class ShipmentController {
                   text-transform: uppercase;
                   border-bottom: 1px solid #ccc;
                   padding-bottom: 1mm;
-                  display: flex; /* 🆕 Flexbox para alinear nombre y teléfono */
-                  justify-content: space-between; /* 🆕 Espacio entre nombre y teléfono */
-                  align-items: center; /* 🆕 Centrado vertical */
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
               }
               
               .customer-name-text {
-                  flex: 1; /* 🆕 El nombre toma el espacio disponible */
-                  margin-right: 2mm; /* 🆕 Espacio entre nombre y teléfono */
+                  flex: 1;
+                  margin-right: 2mm;
               }
               
               .customer-phone-inline {
-                  font-size: 11px; /* 🆕 Ligeramente más pequeño que el nombre */
-                  font-weight: normal; /* 🆕 Peso normal (no bold) */
-                  text-transform: none; /* 🆕 Sin mayúsculas */
-                  color: #666; /* 🆕 Color más suave */
-                  white-space: nowrap; /* 🆕 No romper línea */
+                  font-size: 11px;
+                  font-weight: normal;
+                  text-transform: none;
+                  color: #666;
+                  white-space: nowrap;
               }
               
-              /* 🔧 ELIMINAR el estilo del teléfono separado ya que ahora va inline */
               .customer-phone {
-                  display: none; /* 🆕 Ocultar el teléfono separado */
+                  display: none;
               }
               
               .phone-icon {
@@ -1340,16 +1394,16 @@ class ShipmentController {
 
               .product-info {
                   font-size: 10px;
-                  line-height: 1.4; /* 🔄 AUMENTADO para mejor espaciado */
+                  line-height: 1.4;
                   margin-bottom: 2mm;
                   padding: 1.5mm;
                   border: 1px solid #ddd;
                   border-radius: 2mm;
                   background: #f0f8ff;
                   color: #2c3e50;
-                  min-height: 15mm; /* 🔄 AUMENTADO para acomodar más productos */
-                  max-height: 25mm; /* 🆕 MÁXIMO para no desbalancear la etiqueta */
-                  overflow-y: auto; /* 🆕 SCROLL si hay demasiados productos */
+                  min-height: 12mm;
+                  max-height: 20mm;
+                  overflow-y: auto;
               }
 
               .product-icon {
@@ -1362,13 +1416,15 @@ class ShipmentController {
                   text-align: center;
                   padding: 2mm;
                   border: 2px solid #000;
-                  font-size: 13px;
+                  font-size: 12px;
                   font-weight: bold;
                   margin-top: auto;
                   display: flex;
+                  flex-direction: column;
                   align-items: center;
                   justify-content: center;
-                  gap: 5mm;
+                  gap: 1mm;
+                  min-height: 15mm;
               }
               
               .payment-paid {
@@ -1386,6 +1442,44 @@ class ShipmentController {
               .payment-amount {
                   font-size: 13px;
                   font-weight: bold;
+                  margin-bottom: 1mm;
+              }
+
+              .payment-method {
+                  font-size: 10px;
+                  font-weight: normal;
+                  background: rgba(255, 255, 255, 0.9);
+                  padding: 1mm;
+                  border-radius: 1mm;
+                  border: 1px solid rgba(0, 0, 0, 0.1);
+                  margin-top: 1mm;
+              }
+
+              .payment-pending .payment-method {
+                  background: rgba(255, 255, 255, 0.95);
+                  color: #333;
+              }
+
+              .payment-paid .payment-method {
+                  background: rgba(255, 255, 255, 0.8);
+                  color: #16a34a;
+              }
+
+              /* Estilos específicos para diferentes métodos de pago */
+              .method-efectivo {
+                  border-left: 3px solid #22c55e;
+              }
+
+              .method-transferencia {
+                  border-left: 3px solid #3b82f6;
+              }
+
+              .method-tarjeta {
+                  border-left: 3px solid #f59e0b;
+              }
+
+              .method-contraentrega {
+                  border-left: 3px solid #ef4444;
               }
               
               @media print {
@@ -1411,7 +1505,8 @@ class ShipmentController {
                   .payment-paid,
                   .payment-pending,
                   .customer-address,
-                  .product-info {
+                  .product-info,
+                  .payment-method {
                       -webkit-print-color-adjust: exact;
                       print-color-adjust: exact;
                   }
@@ -1502,14 +1597,22 @@ class ShipmentController {
                           </div>
                       </div>
                       
-                      <!-- Información de pago -->
+                      <!-- Información de pago CON MÉTODO DE PAGO -->
                       <div class="payment-info ${
                         label.isPaid ? "payment-paid" : "payment-pending"
                       }">
                           ${
                             label.isPaid
-                              ? "✅ PAGADO"
-                              : `<span>💰 A PAGAR</span><span class="payment-amount">${label.amountToPay}</span>`
+                              ? `<div>✅ PAGADO</div>
+                                 <div class="payment-method ${getPaymentMethodClass(
+                                   label.paymentMethod
+                                 )}">${label.paymentMethod}</div>`
+                              : `<div class="payment-amount">💰 A PAGAR: ${
+                                  label.amountToPay
+                                }</div>
+                                 <div class="payment-method ${getPaymentMethodClass(
+                                   label.paymentMethod
+                                 )}">${label.paymentMethod}</div>`
                           }
                       </div>
                   </div>
@@ -1538,6 +1641,7 @@ class ShipmentController {
                   etiquetasPorPagina: 6,
                   tamañoEtiqueta: '95x90mm',
                   conProductos: true,
+                  conMetodoPago: true,
                   timestamp: new Date().toISOString()
               });
               
@@ -1557,7 +1661,7 @@ class ShipmentController {
               console.log('  - Ctrl+P: Imprimir etiquetas');
               console.log('  - Escape: Cerrar ventana');
               console.log('  - Configuración: 6 etiquetas de 95x90mm por página A4');
-              console.log('  - Incluye: Cliente, dirección, productos y estado de pago');
+              console.log('  - Incluye: Cliente, dirección, productos, estado de pago Y método de pago');
           </script>
       </body>
       </html>
@@ -1571,7 +1675,7 @@ class ShipmentController {
       res.send(htmlContent);
 
       console.log(
-        `✅ Etiquetas generadas exitosamente para lote: ${batchId} (${labels.length} etiquetas)`
+        `✅ Etiquetas generadas exitosamente para lote: ${batchId} (${labels.length} etiquetas con método de pago)`
       );
     } catch (error) {
       console.error("❌ Error generando etiquetas:", error);
@@ -1589,8 +1693,7 @@ class ShipmentController {
         </html>
     `);
     }
-  } // ACTUALIZACIÓN DE ESTADOS
-  // ==========================================
+  } // ==========================================
 
   // PUT - Actualizar estado de un envío específico
   async updateShipmentStatus(req, res) {
