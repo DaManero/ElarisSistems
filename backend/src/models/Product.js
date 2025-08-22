@@ -66,9 +66,6 @@ Product.init(
       type: DataTypes.STRING(500),
       allowNull: true,
       validate: {
-        isUrl: {
-          msg: "Debe ser una URL válida",
-        },
         len: {
           args: [0, 500],
           msg: "La URL de la imagen debe tener máximo 500 caracteres",

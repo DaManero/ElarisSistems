@@ -5,6 +5,119 @@ const Measure = require("../models/Measure");
 const Provider = require("../models/Provider");
 const { Op } = require("sequelize");
 
+const convertGoogleDriveUrl = (url) => {
+  if (!url || typeof url !== "string") return url;
+
+  const trimmedUrl = url.trim();
+
+  // Si no es de Google Drive, retornar sin cambios
+  if (
+    !trimmedUrl.includes("drive.google.com") &&
+    !trimmedUrl.includes("drive.usercontent.google.com")
+  ) {
+    return trimmedUrl;
+  }
+
+  let fileId = null;
+
+  // Extraer file ID de diferentes formatos
+  const patterns = [
+    /\/file\/d\/([a-zA-Z0-9_-]+)/, // /file/d/ID
+    /id=([a-zA-Z0-9_-]+)/, // id=ID
+    /\/d\/([a-zA-Z0-9_-]+)/, // /d/ID
+  ];
+
+  for (const pattern of patterns) {
+    const match = trimmedUrl.match(pattern);
+    if (match) {
+      fileId = match[1];
+      break;
+    }
+  }
+
+  if (!fileId) {
+    console.warn(`⚠️ No se pudo extraer file ID de: ${trimmedUrl}`);
+    return trimmedUrl;
+  }
+
+  // 🔧 USAR PROXY PARA EVITAR CORS
+  // Opción 1: Usar Google's own proxy (más confiable)
+  const proxyUrl = `https://lh3.googleusercontent.com/d/${fileId}=w1000-h1000`;
+
+  console.log(`🔄 URL de Google Drive convertida con proxy:`);
+  console.log(`   Original: ${trimmedUrl}`);
+  console.log(`   File ID: ${fileId}`);
+  console.log(`   Proxy URL: ${proxyUrl}`);
+
+  return proxyUrl;
+};
+
+// También actualizar processImageUrl para manejar mejor los errores
+const processImageUrl = (url) => {
+  if (!url || typeof url !== "string") return null;
+
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  try {
+    // Convertir URL de Google Drive si es necesario
+    const convertedUrl = convertGoogleDriveUrl(trimmed);
+
+    // Validar que la URL resultante sea válida
+    if (convertedUrl.startsWith("http")) {
+      return convertedUrl;
+    } else {
+      console.error(`❌ URL resultante inválida: ${convertedUrl}`);
+      return null;
+    }
+  } catch (error) {
+    console.error(`❌ Error procesando URL: ${trimmed}`, error);
+    return null;
+  }
+};
+
+// 🔧 ALTERNATIVA: Múltiples opciones de proxy
+const convertGoogleDriveUrlWithFallbacks = (url) => {
+  if (!url || typeof url !== "string") return url;
+
+  const trimmedUrl = url.trim();
+
+  if (
+    !trimmedUrl.includes("drive.google.com") &&
+    !trimmedUrl.includes("drive.usercontent.google.com")
+  ) {
+    return trimmedUrl;
+  }
+
+  let fileId = null;
+  const patterns = [
+    /\/file\/d\/([a-zA-Z0-9_-]+)/,
+    /id=([a-zA-Z0-9_-]+)/,
+    /\/d\/([a-zA-Z0-9_-]+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = trimmedUrl.match(pattern);
+    if (match) {
+      fileId = match[1];
+      break;
+    }
+  }
+
+  if (!fileId) return trimmedUrl;
+
+  // 🔧 MÚLTIPLES OPCIONES DE PROXY (el frontend puede intentar varias)
+  const proxyUrls = [
+    `https://lh3.googleusercontent.com/d/${fileId}=w1000-h1000`, // Proxy de Google
+    `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000-h1000`, // Thumbnail API
+    `https://drive.usercontent.google.com/download?id=${fileId}&export=view`, // Directo (puede fallar)
+  ];
+
+  console.log(`🔄 URLs generadas para ${fileId}:`, proxyUrls);
+
+  // Retornar la primera (más confiable)
+  return proxyUrls[0];
+};
 class ProductController {
   // GET - Get all products
   async getProducts(req, res) {
@@ -205,6 +318,21 @@ class ProductController {
   // POST - Create new product
   async createProduct(req, res) {
     try {
+      console.log("📦 POST /api/products - Datos RAW:", req.body);
+      console.log("📦 POST stringified:", JSON.stringify(req.body, null, 2));
+
+      // 🔧 MAPEAR CAMPOS ANTES DE CREAR
+      const createData = { ...req.body };
+
+      // Si viene imagen_url, mapearla a imagen para la BD
+      if (createData.imagen_url !== undefined) {
+        createData.imagen = processImageUrl(createData.imagen_url);
+        delete createData.imagen_url;
+        console.log("🔄 Mapeando imagen_url -> imagen:", createData.imagen);
+      }
+
+      console.log("🔄 OBJETO FINAL PARA CREAR:", createData);
+
       const {
         fragancia,
         caracteristicas,
@@ -215,9 +343,7 @@ class ProductController {
         stock,
         stock_minimo,
         precio_venta,
-      } = req.body;
-
-      console.log("📦 POST /api/products - Datos:", req.body);
+      } = createData;
 
       // Validación básica
       if (!fragancia || !fragancia.trim()) {
@@ -234,7 +360,12 @@ class ProductController {
         });
       }
 
-      // Crear producto
+      console.log("🔧 DATOS PREPARADOS PARA CREAR:");
+      console.log("   fragancia:", fragancia);
+      console.log("   imagen:", imagen);
+      console.log("   precio_venta:", precio_venta);
+
+      // Crear producto con datos mapeados
       const newProduct = await Product.create({
         fragancia: fragancia.trim(),
         caracteristicas: caracteristicas?.trim() || null,
@@ -246,6 +377,12 @@ class ProductController {
         stock_minimo: parseInt(stock_minimo) || 5,
         precio_venta: parseFloat(precio_venta),
       });
+
+      console.log("📸 PRODUCTO CREADO EN BD:");
+      console.log("   ID:", newProduct.id);
+      console.log("   Fragancia:", newProduct.fragancia);
+      console.log("   Imagen:", newProduct.imagen);
+      console.log("   Precio:", newProduct.precio_venta);
 
       // Cargar el producto con las relaciones
       const productWithRelations = await Product.findByPk(newProduct.id, {
@@ -296,12 +433,61 @@ class ProductController {
       });
     }
   }
-
   // PUT - Update product
   async updateProduct(req, res) {
     try {
       const { id } = req.params;
-      console.log(`📦 PUT /api/products/${id} - Datos:`, req.body);
+      // 🔍 LOGS SÚPER DETALLADOS
+      console.log("=" * 60);
+      console.log(`🔧 DEBUG DETALLADO - Actualizando producto ${id}`);
+      console.log("📦 req.body RAW:", req.body);
+      console.log(
+        "📦 req.body stringified:",
+        JSON.stringify(req.body, null, 2)
+      );
+      // Verificar cada campo individualmente
+      console.log("🔍 CAMPOS INDIVIDUALES:");
+      console.log(
+        "   fragancia:",
+        req.body.fragancia,
+        "(tipo:",
+        typeof req.body.fragancia,
+        ")"
+      );
+      console.log(
+        "   imagen:",
+        req.body.imagen,
+        "(tipo:",
+        typeof req.body.imagen,
+        ")"
+      );
+      console.log(
+        "   imagen_url:",
+        req.body.imagen_url,
+        "(tipo:",
+        typeof req.body.imagen_url,
+        ")"
+      );
+      console.log(
+        "   precio_venta:",
+        req.body.precio_venta,
+        "(tipo:",
+        typeof req.body.precio_venta,
+        ")"
+      );
+      console.log(
+        "   stock:",
+        req.body.stock,
+        "(tipo:",
+        typeof req.body.stock,
+        ")"
+      );
+      // Verificar todas las propiedades del objeto
+      console.log("🔍 TODAS LAS PROPIEDADES DE req.body:");
+      Object.keys(req.body).forEach((key) => {
+        console.log(`   ${key}: "${req.body[key]}" (${typeof req.body[key]})`);
+      });
+      console.log("=" * 60);
 
       const product = await Product.findByPk(id);
       if (!product) {
@@ -311,8 +497,36 @@ class ProductController {
         });
       }
 
-      // Actualizar producto
-      await product.update(req.body);
+      // 🔍 Log del producto ANTES de actualizar
+      console.log("📸 ESTADO ACTUAL DEL PRODUCTO:");
+      console.log("   ID:", product.id);
+      console.log("   Fragancia:", product.fragancia);
+      console.log("   Imagen ANTES:", product.imagen);
+      console.log("   Precio ANTES:", product.precio_venta);
+      console.log("   Stock ANTES:", product.stock);
+
+      // 🔧 MAPEAR CAMPOS ANTES DE ACTUALIZAR
+      const updateData = { ...req.body };
+
+      // Si viene imagen_url, mapearla a imagen para la BD
+      if (updateData.imagen_url !== undefined) {
+        updateData.imagen = processImageUrl(updateData.imagen_url);
+        delete updateData.imagen_url; // Eliminar el campo original
+        console.log("🔄 Mapeando imagen_url -> imagen:", updateData.imagen);
+      }
+
+      console.log("🔄 OBJETO FINAL PARA ACTUALIZAR:", updateData);
+
+      // 🔍 INTENTAR ACTUALIZAR Y VER QUÉ PASA
+      console.log("🔄 INTENTANDO ACTUALIZAR CON:", updateData);
+
+      await product.update(updateData);
+
+      console.log("📸 ESTADO DESPUÉS DE product.update():");
+      console.log("   Fragancia DESPUÉS:", product.fragancia);
+      console.log("   Imagen DESPUÉS:", product.imagen);
+      console.log("   Precio DESPUÉS:", product.precio_venta);
+      console.log("   Stock DESPUÉS:", product.stock);
 
       // Cargar producto actualizado con relaciones
       const updatedProduct = await Product.findByPk(id, {
@@ -338,6 +552,13 @@ class ProductController {
         ],
       });
 
+      console.log("🎯 PRODUCTO FINAL DE LA BASE DE DATOS:");
+      console.log("   Fragancia FINAL:", updatedProduct.fragancia);
+      console.log("   Imagen FINAL:", updatedProduct.imagen);
+      console.log("   Precio FINAL:", updatedProduct.precio_venta);
+      console.log("   Stock FINAL:", updatedProduct.stock);
+      console.log("=" * 60);
+
       console.log(`✅ Producto actualizado: ${product.fragancia}`);
 
       res.json({
@@ -354,8 +575,6 @@ class ProductController {
       });
     }
   }
-
-  // PATCH - Toggle product status
   async toggleProductStatus(req, res) {
     try {
       const { id } = req.params;

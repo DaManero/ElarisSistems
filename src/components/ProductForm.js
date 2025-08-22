@@ -45,7 +45,7 @@ const ProductForm = ({
   const [formData, setFormData] = useState({
     fragancia: "",
     caracteristicas: "",
-    imagen: "",
+    imagen_url: "",
     categoria_id: "",
     medida_id: "",
     proveedor_id: "",
@@ -70,7 +70,7 @@ const ProductForm = ({
       setFormData({
         fragancia: productData.fragancia || "",
         caracteristicas: productData.caracteristicas || "",
-        imagen: productData.imagen || "",
+        imagen_url: productData.imagen_url || "",
         categoria_id: productData.categoria_id || "",
         medida_id: productData.medida_id || "",
         proveedor_id: productData.proveedor_id || "",
@@ -79,12 +79,12 @@ const ProductForm = ({
         precio_venta: productData.precio_venta || "",
         status: productData.status !== undefined ? productData.status : true,
       });
-      setImagePreview(productData.imagen || "");
+      setImagePreview(productData.imagen_url || "");
     } else {
       setFormData({
         fragancia: "",
         caracteristicas: "",
-        imagen: "",
+        imagen_url: "",
         categoria_id: "",
         medida_id: "",
         proveedor_id: "",
@@ -115,8 +115,8 @@ const ProductForm = ({
       [name]: newValue,
     }));
 
-    // Preview de imagen
-    if (name === "imagen" && value) {
+    // Preview de imagen_url
+    if (name === "imagen_url" && value) {
       if (productService.isValidImageUrl(value)) {
         setImagePreview(value);
       } else {
@@ -130,6 +130,12 @@ const ProductForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 🔍 LOGS DEL FRONTEND
+    console.log("🎯 FRONTEND - Datos que se van a enviar:");
+    console.log("formData completo:", formData);
+    console.log("Campo imagen específicamente:", formData.imagen);
+    console.log("Campo imagen_url específicamente:", formData.imagen_url);
 
     // Validar formulario
     const validation = productService.validateProductData(formData);
@@ -145,6 +151,7 @@ const ProductForm = ({
     try {
       let response;
       if (isEditMode) {
+        console.log("🔄 ENVIANDO AL BACKEND:", formData);
         response = await productService.updateProduct(productData.id, formData);
         setSuccess("Producto actualizado exitosamente");
       } else {
@@ -166,7 +173,6 @@ const ProductForm = ({
       setLoading(false);
     }
   };
-
   const handleClose = () => {
     if (!loading && onClose) {
       setError("");
@@ -487,22 +493,22 @@ const ProductForm = ({
               />
             </Grid>
 
-            {/* Imagen */}
+            {/* imagen_url */}
             <Grid item xs={12}>
               <Typography
                 variant="h6"
                 sx={{ mb: 2, color: "#1C1C26", fontWeight: 500 }}
               >
-                Imagen del Producto
+                imagen del Producto
               </Typography>
             </Grid>
 
             <Grid item xs={12} md={8}>
               <TextField
                 fullWidth
-                label="URL de la Imagen"
-                name="imagen"
-                value={formData.imagen}
+                label="URL de la imagen_url"
+                name="imagen_url"
+                value={formData.imagen_url}
                 onChange={handleChange}
                 disabled={loading}
                 variant="outlined"
@@ -519,7 +525,7 @@ const ProductForm = ({
               />
             </Grid>
 
-            {/* Preview de Imagen */}
+            {/* Preview de imagen_url */}
             <Grid item xs={12} md={4}>
               <Box
                 sx={{

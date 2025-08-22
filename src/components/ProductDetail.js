@@ -29,6 +29,7 @@ import {
   ImageNotSupported,
 } from "@mui/icons-material";
 import { productService } from "../services/productService";
+import RobustImage from "./RobustImage";
 
 const ProductDetail = ({ open, product, onClose, onEdit }) => {
   if (!product) return null;
@@ -163,19 +164,16 @@ const ProductDetail = ({ open, product, onClose, onEdit }) => {
                 }}
               >
                 {product.imagen ? (
-                  <Avatar
+                  <RobustImage
                     src={product.imagen}
-                    sx={{
+                    alt={product.fragancia}
+                    style={{
                       width: "100%",
-                      height: "100%",
-                      borderRadius: 0,
+                      height: "280px",
+                      objectFit: "cover",
                     }}
-                    variant="square"
-                  >
-                    <ImageNotSupported
-                      sx={{ fontSize: 60, color: "#9ca3af" }}
-                    />
-                  </Avatar>
+                    fallbackSrc="https://images.unsplash.com/photo-1541643600914-78b084683601?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
+                  />
                 ) : (
                   <Box
                     sx={{

@@ -45,6 +45,7 @@ import { categoryService } from "../services/categoryService";
 import { providerService } from "../services/providerService";
 import ProductForm from "./ProductForm";
 import ProductDetail from "./ProductDetail";
+import RobustImage from "./RobustImage";
 
 const ProductList = () => {
   // Estados principales
@@ -447,13 +448,17 @@ const ProductList = () => {
                         <Box
                           sx={{ display: "flex", alignItems: "center", gap: 1 }}
                         >
-                          <Avatar
+                          <RobustImage
                             src={product.imagen}
-                            sx={{ width: 32, height: 32 }}
-                            variant="rounded"
-                          >
-                            <Inventory />
-                          </Avatar>
+                            alt={product.fragancia}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: "8px",
+                              objectFit: "cover",
+                            }}
+                            fallbackSrc="https://images.unsplash.com/photo-1541643600914-78b084683601?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
+                          />
                           <Box>
                             <Typography
                               variant="body2"
